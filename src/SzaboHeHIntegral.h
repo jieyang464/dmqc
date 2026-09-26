@@ -18,10 +18,10 @@
 namespace szabo_heh {
 
 // Bond length in bohr; chosen so that Vnn = Z_He * Z_H / R = 1.3669 Hartree.
-constexpr double kBondLengthBohr = 1.4632;
-constexpr double kZetaHe = 2.0925;
-constexpr double kZetaH = 1.24;
-constexpr double kNuclearRepulsion = 1.3669;
+inline constexpr double kBondLengthBohr = 1.4632;
+inline constexpr double kZetaHe = 2.0925;
+inline constexpr double kZetaH = 1.24;
+inline constexpr double kNuclearRepulsion = 1.3669;
 
 // STO-3G contraction for a unit-zeta 1s Slater function (Hehre, Stewart &
 // Pople, JCP 51, 2657 (1969)).  Exponents scale as zeta^2.
@@ -51,7 +51,6 @@ public:
     T2 ComputeHcore() const override;
     T2 ComputeOverlap() const override;
     T4 ComputeERI() const override;
-    double ComputeERI(int i, int j, int k, int l) const override;
     // Computed from the geometry rather than returning the book's printed
     // 1.3669: that rounding was worth 3.3e-5 Hartree of spurious disagreement
     // with libint2.  See geometry.h for why this is a free function.
