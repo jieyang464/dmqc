@@ -19,14 +19,13 @@ parameterization. Following Helgaker, Jørgensen and Olsen (Ch. 10, §10.7), the
 density is updated by a similarity transform in the overlap metric:
 
 ```
-D  ←  e^(−XS)  D  e^(SX)
+D  ←  e^(−RS)  D  e^(SR)
 ```
 
-with the generator taken from the **S-metric commutator** of the Fock and
-density matrices:
+with 
 
 ```
-X  =  h · (F D S  −  S D F)
+R = F D S  −  S D F
 ```
 
 Three properties make this work.
@@ -39,7 +38,7 @@ and a positive step `h` lowers the energy. (The sign is easy to get backwards:
 with the opposite sign the iteration converges just as happily, to the *highest*
 stationary point.)
 
-**It preserves the constraints exactly.** `e^(−XS) D e^(SX)` is a similarity
+**It preserves the constraints exactly.** `e^(−RS) D e^(SR)` is a similarity
 transform in the `S` metric, so both the electron count `Tr(DS)` and the
 idempotency `DSD = D` are conserved — no orthogonalization, no re-imposition of
 occupation numbers.
@@ -70,6 +69,15 @@ density builders to achieve a modular and maintainable design.
 Such as, it currently provides two integral providers one based on the Szabo 
 book's HeH+ numerical example, another being the libint2, and is flexible with 
 adding new integral providers.
+
+**One geometry, one integral evaluation.** A provider is driven exactly once per
+geometry, by `ComputeMolecularIntegrals` / `ComputeMolecularIntegralDerivatives`
+in `src/integrals.h`, and what everything downstream sees is the resulting data
+bundle: `hcore`, `overlap`, the ERI tensor, `dS/dx`, `dHcore/dx` and `dERI/dx`.
+No JK builder, Fock builder, SCF loop or gradient assembler holds a provider, so
+none of them can trigger an integral evaluation. A geometry optimization step is
+one such scope: it builds both bundles at the top, converges the SCF on them, and
+assembles the gradient from them.
 
 ---
 
@@ -122,9 +130,19 @@ This is a proof of concept, and the following are deliberate:
 Schwarz screening to skip negligible shell quartets, and none is applied. The
 density update is `O(N³)` matrix multiplication and the J/K build is `O(N⁴)`, so
 the program demonstrates that the *algorithm* works without demonstrating that
-it *scales*. `ForEachEriDerivative` is shaped to make screening a natural
-addition — it is a decision about a shell quartet, and that is the level the
-provider iterates at.
+it *scales*. Screening is a decision about a shell quartet, and the shell-quartet
+loops it belongs in are still there, inside the providers — it is the fill of the
+ERI tensor and of the ERI derivative tensors that would skip work.
+
+**Everything is in core, including `dERI/dx`.** The ERI tensor is a dense `N⁴`,
+and its derivatives are `3·natoms` more of them — 2 MB for water/6-31G, and out
+of reach for anything a production code would run. `dERI/dx` used to be streamed
+shell quartet by shell quartet into the gradient contraction so that it was never
+stored; that was the one lazily evaluated integral in the code, and it was traded
+for the uniform rule above. Restoring the streaming form is the first thing a
+larger system would need, and it is a change to `IIntegralDerivativeProvider` and
+`IEffectiveDensities` together: the derivative blocks and the matching `Gamma`
+blocks are only useful in the same place, at the same time.
 
 
 **Initial guess on the density is still done by Hcore diagonalization.** To 
